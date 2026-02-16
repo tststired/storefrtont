@@ -12,13 +12,19 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState(null) // null | { mode: 'add' } | { mode: 'edit', item }
+  const [error, setError] = useState('')
   const navigate = useNavigate()
 
   const fetchItems = () => {
-    api.get('/items').then((res) => {
-      setItems(res.data)
-      setLoading(false)
-    })
+    api.get('/items')
+      .then((res) => {
+        setItems(res.data)
+        setLoading(false)
+      })
+      .catch(() => {
+        setError('Failed to load items.')
+        setLoading(false)
+      })
   }
 
   useEffect(() => { fetchItems() }, [])
@@ -37,26 +43,38 @@ export default function AdminDashboard() {
   }, [items, category, statusFilter, search])
 
   const handleSave = async (fd) => {
-    if (modal.mode === 'add') {
-      await api.post('/items', fd)
-    } else {
-      await api.put(`/items/${modal.item.id}`, fd)
+    try {
+      if (modal.mode === 'add') {
+        await api.post('/items', fd)
+      } else {
+        await api.put(`/items/${modal.item.id}`, fd)
+      }
+      setModal(null)
+      fetchItems()
+    } catch {
+      alert('Failed to save item. Please try again.')
     }
-    setModal(null)
-    fetchItems()
   }
 
   const handleDelete = async (item) => {
     if (!window.confirm(`Delete "${item.title}"?`)) return
-    await api.delete(`/items/${item.id}`)
-    fetchItems()
+    try {
+      await api.delete(`/items/${item.id}`)
+      fetchItems()
+    } catch {
+      alert('Failed to delete item.')
+    }
   }
 
   const handleToggleSold = async (item) => {
     const fd = new FormData()
     fd.append('sold', String(!item.sold))
-    await api.put(`/items/${item.id}`, fd)
-    fetchItems()
+    try {
+      await api.put(`/items/${item.id}`, fd)
+      fetchItems()
+    } catch {
+      alert('Failed to update item.')
+    }
   }
 
   const handleLogout = () => {
@@ -90,6 +108,8 @@ export default function AdminDashboard() {
           statusFilter={statusFilter} setStatusFilter={setStatusFilter}
           search={search} setSearch={setSearch}
         />
+
+        {error && <p className="text-red-500 text-center mt-4">{error}</p>}
 
         {loading ? (
           <p className="text-gray-400 text-center mt-16">Loading...</p>

@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export default function ItemCard({ item, adminMode, onEdit, onDelete, onToggleSold }) {
   const imageUrl = item.image_filename

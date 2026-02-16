@@ -5,7 +5,7 @@ const CATEGORIES = [
   { value: 'mousepads', label: 'Mousepads' },
 ]
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export default function ItemFormModal({ item, onSave, onClose }) {
   const [title, setTitle] = useState(item?.title || '')
@@ -32,13 +32,18 @@ export default function ItemFormModal({ item, onSave, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    const fd = new FormData()
-    fd.append('title', title)
-    fd.append('price', price)
-    fd.append('category', category)
-    if (image) fd.append('image', image)
-    await onSave(fd)
-    setLoading(false)
+    try {
+      const fd = new FormData()
+      fd.append('title', title)
+      fd.append('price', price)
+      fd.append('category', category)
+      if (image) fd.append('image', image)
+      await onSave(fd)
+    } catch {
+      // Parent (AdminDashboard) handles error display
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

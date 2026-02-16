@@ -10,12 +10,18 @@ export default function StoreFront() {
   const [category, setCategory] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    api.get('/items').then((res) => {
-      setItems(res.data)
-      setLoading(false)
-    })
+    api.get('/items')
+      .then((res) => {
+        setItems(res.data)
+        setLoading(false)
+      })
+      .catch(() => {
+        setError('Failed to load items.')
+        setLoading(false)
+      })
   }, [])
 
   const filtered = useMemo(() => {
@@ -46,6 +52,8 @@ export default function StoreFront() {
           statusFilter={statusFilter} setStatusFilter={setStatusFilter}
           search={search} setSearch={setSearch}
         />
+
+        {error && <p className="text-red-500 text-center mt-4">{error}</p>}
 
         {loading ? (
           <p className="text-gray-400 text-center mt-16">Loading...</p>
