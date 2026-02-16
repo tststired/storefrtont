@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 import jwt
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
@@ -17,7 +17,7 @@ class TokenResponse(BaseModel):
 @router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest):
     if body.username != ADMIN_USER or body.password != ADMIN_PASS:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     expire = datetime.now(timezone.utc) + timedelta(days=7)
     token = jwt.encode(
