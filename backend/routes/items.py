@@ -1,17 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from typing import Optional, Literal
 from bson import ObjectId
 from datetime import datetime, timezone
 import uuid
 import os
+import re
 import aiofiles
+import aiofiles.os
 
 from database import get_db
 from dependencies import get_current_admin
 from config import UPLOADS_DIR
+from models import ItemOut
+from typing import List
 
 router = APIRouter()
+
+MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 def item_to_dict(item: dict) -> dict:
     item["id"] = str(item.pop("_id"))
@@ -22,7 +27,7 @@ def allowed_file(filename: str) -> bool:
 
 # ── Public: list items ──────────────────────────────────────────────────────
 
-@router.get("")
+@router.get("", response_model=List[ItemOut])
 async def list_items(
     category: Optional[str] = None,
     search: Optional[str] = None,
@@ -40,7 +45,8 @@ async def list_items(
         query["sold"] = False
 
     if search:
-        query["title"] = {"$regex": search, "$options": "i"}
+        safe_search = re.escape(search)
+        query["title"] = {"$regex": safe_search, "$options": "i"}
 
     cursor = db.items.find(query).sort("created_at", -1)
     items = []
@@ -50,7 +56,7 @@ async def list_items(
 
 # ── Admin: create item ──────────────────────────────────────────────────────
 
-@router.post("")
+@router.post("", response_model=ItemOut, status_code=201)
 async def create_item(
     title: str = Form(...),
     price: float = Form(...),
@@ -63,12 +69,14 @@ async def create_item(
 
     if image and image.filename:
         if not allowed_file(image.filename):
-            raise HTTPException(400, "File type not allowed")
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "File type not allowed")
+        content = await image.read()
+        if len(content) > MAX_IMAGE_BYTES:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Image too large (max 10 MB)")
         ext = image.filename.rsplit(".", 1)[-1].lower()
         image_filename = f"{uuid.uuid4()}.{ext}"
         dest = os.path.join(UPLOADS_DIR, image_filename)
         async with aiofiles.open(dest, "wb") as f:
-            content = await image.read()
             await f.write(content)
 
     doc = {
@@ -85,7 +93,7 @@ async def create_item(
 
 # ── Admin: update item ──────────────────────────────────────────────────────
 
-@router.put("/{item_id}")
+@router.put("/{item_id}", response_model=ItemOut)
 async def update_item(
     item_id: str,
     title: Optional[str] = Form(None),
@@ -100,11 +108,11 @@ async def update_item(
     try:
         oid = ObjectId(item_id)
     except Exception:
-        raise HTTPException(400, "Invalid item ID")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid item ID")
 
     existing = await db.items.find_one({"_id": oid})
     if not existing:
-        raise HTTPException(404, "Item not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Item not found")
 
     updates = {}
     if title is not None:
@@ -118,21 +126,25 @@ async def update_item(
 
     if image and image.filename:
         if not allowed_file(image.filename):
-            raise HTTPException(400, "File type not allowed")
-        # Delete old image
-        if existing.get("image_filename"):
-            old = os.path.join(UPLOADS_DIR, existing["image_filename"])
-            if os.path.exists(old):
-                os.remove(old)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "File type not allowed")
+        content = await image.read()
+        if len(content) > MAX_IMAGE_BYTES:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Image too large (max 10 MB)")
         ext = image.filename.rsplit(".", 1)[-1].lower()
         new_filename = f"{uuid.uuid4()}.{ext}"
         dest = os.path.join(UPLOADS_DIR, new_filename)
+        # Write new file first, then delete old (safer ordering)
         async with aiofiles.open(dest, "wb") as f:
-            content = await image.read()
             await f.write(content)
+        # Delete old image after successful write
+        if existing.get("image_filename"):
+            old = os.path.join(UPLOADS_DIR, existing["image_filename"])
+            if await aiofiles.os.path.exists(old):
+                await aiofiles.os.remove(old)
         updates["image_filename"] = new_filename
 
-    await db.items.update_one({"_id": oid}, {"$set": updates})
+    if updates:
+        await db.items.update_one({"_id": oid}, {"$set": updates})
     updated = await db.items.find_one({"_id": oid})
     return item_to_dict(updated)
 
@@ -148,16 +160,16 @@ async def delete_item(
     try:
         oid = ObjectId(item_id)
     except Exception:
-        raise HTTPException(400, "Invalid item ID")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid item ID")
 
     existing = await db.items.find_one({"_id": oid})
     if not existing:
-        raise HTTPException(404, "Item not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Item not found")
 
     if existing.get("image_filename"):
         img_path = os.path.join(UPLOADS_DIR, existing["image_filename"])
-        if os.path.exists(img_path):
-            os.remove(img_path)
+        if await aiofiles.os.path.exists(img_path):
+            await aiofiles.os.remove(img_path)
 
     await db.items.delete_one({"_id": oid})
     return {"deleted": True}
