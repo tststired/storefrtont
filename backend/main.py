@@ -8,10 +8,11 @@ from database import connect_db, close_db
 from config import UPLOADS_DIR
 from routes import auth, items
 
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
-    os.makedirs(UPLOADS_DIR, exist_ok=True)
     yield
     await close_db()
 

@@ -12,7 +12,9 @@ async def connect_db():
 async def close_db():
     global client
     if client:
-        client.close()
+        client.close()  # Motor's close() is synchronous; do not await
 
 def get_db():
+    if db is None:
+        raise RuntimeError("Database not initialised — lifespan has not run")
     return db
