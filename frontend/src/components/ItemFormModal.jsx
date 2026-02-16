@@ -17,7 +17,7 @@ export default function ItemFormModal({ item, onSave, onClose }) {
 
   useEffect(() => {
     if (item?.image_filename) {
-      setPreview(`${API_BASE}/uploads/${item.image_filename}`)
+      setPreview(`/api/uploads/${item.image_filename}`)
     }
   }, [item])
 

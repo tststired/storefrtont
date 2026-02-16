@@ -1,12 +1,11 @@
 from pydantic import BaseModel
 from typing import Optional, Literal
-from datetime import datetime
 
 class ItemOut(BaseModel):
-    id: str
+    id: int
     title: str
     price: float
     category: Literal["mice", "mousepads"]
     image_filename: Optional[str] = None
     sold: bool
-    created_at: datetime
+    created_at: str

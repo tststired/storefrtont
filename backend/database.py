@@ -1,20 +1,33 @@
-from motor.motor_asyncio import AsyncIOMotorClient
-from config import MONGO_URL, DB_NAME
+import aiosqlite
+from config import DATABASE_PATH
 
-client: AsyncIOMotorClient = None
-db = None
+db_connection = None
 
 async def connect_db():
-    global client, db
-    client = AsyncIOMotorClient(MONGO_URL)
-    db = client[DB_NAME]
+    global db_connection
+    db_connection = await aiosqlite.connect(DATABASE_PATH)
+    db_connection.row_factory = aiosqlite.Row
+    
+    # Create items table
+    await db_connection.execute("""
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            price REAL NOT NULL,
+            category TEXT NOT NULL,
+            image_filename TEXT,
+            sold INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+    """)
+    await db_connection.commit()
 
 async def close_db():
-    global client
-    if client:
-        client.close()  # Motor's close() is synchronous; do not await
+    global db_connection
+    if db_connection:
+        await db_connection.close()
 
 def get_db():
-    if db is None:
+    if db_connection is None:
         raise RuntimeError("Database not initialised — lifespan has not run")
-    return db
+    return db_connection

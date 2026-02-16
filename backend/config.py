@@ -13,6 +13,5 @@ ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = _require("ADMIN_PASS")
 JWT_SECRET = _require("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "jimmystore")
+DATABASE_PATH = os.getenv("DATABASE_PATH", "jimmystore.db")
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")

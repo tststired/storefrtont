@@ -1,8 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
 export default function ItemCard({ item, adminMode, onEdit, onDelete, onToggleSold }) {
   const imageUrl = item.image_filename
-    ? `${API_BASE}/uploads/${item.image_filename}`
+    ? `/api/uploads/${item.image_filename}`
     : null
 
   return (
